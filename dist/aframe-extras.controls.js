@@ -1,4 +1,4 @@
-(function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+(function(){function r(e,n,t){function o(i,f){if(!n[i]){if(!e[i]){var c="function"==typeof require&&require;if(!f&&c)return c(i,!0);if(u)return u(i,!0);var a=new Error("Cannot find module '"+i+"'");throw a.code="MODULE_NOT_FOUND",a}var p=n[i]={exports:{}};e[i][0].call(p.exports,function(r){var n=e[i][1][r];return o(n||r)},p,p.exports,r,e,n,t)}return n[i].exports}for(var u="function"==typeof require&&require,i=0;i<t.length;i++)o(t[i]);return o}return r})()({1:[function(require,module,exports){
 'use strict';
 
 require('./src/controls');
@@ -1233,10 +1233,11 @@ require('./checkpoint-controls');
 require('./gamepad-controls');
 require('./keyboard-controls');
 require('./touch-controls');
+require('./mouse-touch-controls');
 require('./movement-controls');
 require('./trackpad-controls');
 
-},{"./checkpoint-controls":5,"./gamepad-controls":6,"./keyboard-controls":8,"./movement-controls":9,"./touch-controls":10,"./trackpad-controls":11}],8:[function(require,module,exports){
+},{"./checkpoint-controls":5,"./gamepad-controls":6,"./keyboard-controls":8,"./mouse-touch-controls":9,"./movement-controls":10,"./touch-controls":11,"./trackpad-controls":12}],8:[function(require,module,exports){
 'use strict';
 
 require('../../lib/keyboard.polyfill');
@@ -1402,6 +1403,168 @@ module.exports = AFRAME.registerComponent('keyboard-controls', {
 });
 
 },{"../../lib/keyboard.polyfill":4}],9:[function(require,module,exports){
+'use strict';
+
+/**
+ * Touch-to-move-forward controls for mobile.
+ */
+
+module.exports = AFRAME.registerComponent('mouse-touch-controls', {
+  schema: {
+    enabled: { default: true },
+    reverseEnabled: { default: true }
+  },
+
+  init: function init() {
+    this.dVelocity = new THREE.Vector3();
+    this.bindMethods();
+    this.direction = 0;
+    this.inProgress = false;
+    this.prevPointerPosition = null;
+  },
+  play: function play() {
+    this.addEventListeners();
+  },
+  pause: function pause() {
+    this.removeEventListeners();
+    this.dVelocity.set(0, 0, 0);
+  },
+  remove: function remove() {
+    this.pause();
+  },
+  addEventListeners: function addEventListeners() {
+    var sceneEl = this.el.sceneEl;
+
+    var canvasEl = sceneEl.canvas;
+
+    if (!canvasEl) {
+      sceneEl.addEventListener('render-target-loaded', this.addEventListeners.bind(this));
+      return;
+    }
+
+    canvasEl.addEventListener('touchstart', this.onTouchStart);
+    canvasEl.addEventListener('touchmove', this.onTouchMove);
+    canvasEl.addEventListener('touchend', this.onTouchEnd);
+    canvasEl.addEventListener('mousedown', this.onMouseDown);
+    canvasEl.addEventListener('mousemove', this.onMouseMove);
+    canvasEl.addEventListener('mouseup', this.onMouseUp);
+  },
+  removeEventListeners: function removeEventListeners() {
+    var canvasEl = this.el.sceneEl && this.el.sceneEl.canvas;
+    if (!canvasEl) {
+      return;
+    }
+
+    canvasEl.removeEventListener('touchstart', this.onTouchStart);
+    canvasEl.removeEventListener('touchmove', this.onTouchMove);
+    canvasEl.removeEventListener('touchend', this.onTouchEnd);
+    canvasEl.removeEventListener('mousedown', this.onMouseDown);
+    canvasEl.removeEventListener('mousemove', this.onMouseMove);
+    canvasEl.removeEventListener('mouseup', this.onMouseUp);
+  },
+  isVelocityActive: function isVelocityActive() {
+    return this.data.enabled && !!this.direction;
+  },
+  getVelocityDelta: function getVelocityDelta() {
+    this.dVelocity.z = this.direction / 3;
+    return this.dVelocity.clone();
+  },
+  bindMethods: function bindMethods() {
+    this.onTouchStart = this.onTouchStart.bind(this);
+    this.onTouchMove = this.onTouchMove.bind(this);
+    this.onTouchEnd = this.onTouchEnd.bind(this);
+    this.onMouseDown = this.onMouseDown.bind(this);
+    this.onMouseMove = this.onMouseMove.bind(this);
+    this.onMouseUp = this.onMouseUp.bind(this);
+  },
+  onTouchStart: function onTouchStart(e) {
+    if (!e.touches || !e.touches.length) {
+      e.preventDefault();
+      return;
+    }
+    this.inProgress = true;
+    var targetMovement = e.touches[0];
+    this.prevPointerPosition = {
+      x: targetMovement.clientX,
+      y: targetMovement.clientY
+    };
+    e.preventDefault();
+  },
+  onTouchMove: function onTouchMove(e) {
+    if (!this.inProgress) {
+      e.preventDefault();
+      return;
+    }
+    if (!e.touches || !e.touches.length) {
+      e.preventDefault();
+      return;
+    }
+    var targetMovement = e.touches[0];
+    var dY = targetMovement.clientY - this.prevPointerPosition.y;
+    var dX = targetMovement.clientX - this.prevPointerPosition.x;
+    if (!this.isVerticalMovement(dX, dY)) {
+      e.preventDefault();
+      return;
+    }
+    if (dY > 0) {
+      this.direction = 1;
+    }
+    if (dY < 0) {
+      this.direction = -1;
+    }
+    this.prevPointerPosition.x = targetMovement.clientX;
+    this.prevPointerPosition.y = targetMovement.clientY;
+    e.preventDefault();
+  },
+  onTouchEnd: function onTouchEnd(e) {
+    this.prevPointerPosition = null;
+    this.inProgress = false;
+    this.direction = 0;
+    e.preventDefault();
+  },
+  onMouseDown: function onMouseDown(e) {
+    this.inProgress = true;
+    var targetMovement = e;
+    this.prevPointerPosition = {
+      x: targetMovement.clientX,
+      y: targetMovement.clientY
+    };
+    e.preventDefault();
+  },
+  onMouseMove: function onMouseMove(e) {
+    if (!this.inProgress) {
+      e.preventDefault();
+      return;
+    }
+    var targetMovement = e;
+    var dY = targetMovement.clientY - this.prevPointerPosition.y;
+    var dX = targetMovement.clientX - this.prevPointerPosition.x;
+    if (!this.isVerticalMovement(dX, dY)) {
+      e.preventDefault();
+      return;
+    }
+    if (dY > 0) {
+      this.direction = 1;
+    }
+    if (dY < 0) {
+      this.direction = -1;
+    }
+    this.prevPointerPosition.x = targetMovement.clientX;
+    this.prevPointerPosition.y = targetMovement.clientY;
+    e.preventDefault();
+  },
+  onMouseUp: function onMouseUp(e) {
+    this.prevPointerPosition = null;
+    this.inProgress = false;
+    this.direction = 0;
+    e.preventDefault();
+  },
+  isVerticalMovement: function isVerticalMovement(dX, dY) {
+    return Math.abs(dY) > Math.abs(dX) && Math.abs(dY) > 3;
+  }
+});
+
+},{}],10:[function(require,module,exports){
 'use strict';
 
 /**
@@ -1607,7 +1770,7 @@ module.exports = AFRAME.registerComponent('movement-controls', {
   }()
 });
 
-},{}],10:[function(require,module,exports){
+},{}],11:[function(require,module,exports){
 'use strict';
 
 /**
@@ -1690,7 +1853,7 @@ module.exports = AFRAME.registerComponent('touch-controls', {
   }
 });
 
-},{}],11:[function(require,module,exports){
+},{}],12:[function(require,module,exports){
 'use strict';
 
 /**

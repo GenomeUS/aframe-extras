@@ -1,4 +1,4 @@
-(function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+(function(){function r(e,n,t){function o(i,f){if(!n[i]){if(!e[i]){var c="function"==typeof require&&require;if(!f&&c)return c(i,!0);if(u)return u(i,!0);var a=new Error("Cannot find module '"+i+"'");throw a.code="MODULE_NOT_FOUND",a}var p=n[i]={exports:{}};e[i][0].call(p.exports,function(r){var n=e[i][1][r];return o(n||r)},p,p.exports,r,e,n,t)}return n[i].exports}for(var u="function"==typeof require&&require,i=0;i<t.length;i++)o(t[i]);return o}return r})()({1:[function(require,module,exports){
 'use strict';
 
 require('./');
@@ -12,7 +12,7 @@ require('./src/misc');
 require('./src/pathfinding');
 require('./src/primitives');
 
-},{"./src/controls":14,"./src/loaders":23,"./src/misc":28,"./src/pathfinding":34,"./src/primitives":42}],3:[function(require,module,exports){
+},{"./src/controls":14,"./src/loaders":24,"./src/misc":29,"./src/pathfinding":35,"./src/primitives":43}],3:[function(require,module,exports){
 'use strict';
 
 /**
@@ -9173,10 +9173,11 @@ require('./checkpoint-controls');
 require('./gamepad-controls');
 require('./keyboard-controls');
 require('./touch-controls');
+require('./mouse-touch-controls');
 require('./movement-controls');
 require('./trackpad-controls');
 
-},{"./checkpoint-controls":12,"./gamepad-controls":13,"./keyboard-controls":15,"./movement-controls":16,"./touch-controls":17,"./trackpad-controls":18}],15:[function(require,module,exports){
+},{"./checkpoint-controls":12,"./gamepad-controls":13,"./keyboard-controls":15,"./mouse-touch-controls":16,"./movement-controls":17,"./touch-controls":18,"./trackpad-controls":19}],15:[function(require,module,exports){
 'use strict';
 
 require('../../lib/keyboard.polyfill');
@@ -9342,6 +9343,168 @@ module.exports = AFRAME.registerComponent('keyboard-controls', {
 });
 
 },{"../../lib/keyboard.polyfill":10}],16:[function(require,module,exports){
+'use strict';
+
+/**
+ * Touch-to-move-forward controls for mobile.
+ */
+
+module.exports = AFRAME.registerComponent('mouse-touch-controls', {
+  schema: {
+    enabled: { default: true },
+    reverseEnabled: { default: true }
+  },
+
+  init: function init() {
+    this.dVelocity = new THREE.Vector3();
+    this.bindMethods();
+    this.direction = 0;
+    this.inProgress = false;
+    this.prevPointerPosition = null;
+  },
+  play: function play() {
+    this.addEventListeners();
+  },
+  pause: function pause() {
+    this.removeEventListeners();
+    this.dVelocity.set(0, 0, 0);
+  },
+  remove: function remove() {
+    this.pause();
+  },
+  addEventListeners: function addEventListeners() {
+    var sceneEl = this.el.sceneEl;
+
+    var canvasEl = sceneEl.canvas;
+
+    if (!canvasEl) {
+      sceneEl.addEventListener('render-target-loaded', this.addEventListeners.bind(this));
+      return;
+    }
+
+    canvasEl.addEventListener('touchstart', this.onTouchStart);
+    canvasEl.addEventListener('touchmove', this.onTouchMove);
+    canvasEl.addEventListener('touchend', this.onTouchEnd);
+    canvasEl.addEventListener('mousedown', this.onMouseDown);
+    canvasEl.addEventListener('mousemove', this.onMouseMove);
+    canvasEl.addEventListener('mouseup', this.onMouseUp);
+  },
+  removeEventListeners: function removeEventListeners() {
+    var canvasEl = this.el.sceneEl && this.el.sceneEl.canvas;
+    if (!canvasEl) {
+      return;
+    }
+
+    canvasEl.removeEventListener('touchstart', this.onTouchStart);
+    canvasEl.removeEventListener('touchmove', this.onTouchMove);
+    canvasEl.removeEventListener('touchend', this.onTouchEnd);
+    canvasEl.removeEventListener('mousedown', this.onMouseDown);
+    canvasEl.removeEventListener('mousemove', this.onMouseMove);
+    canvasEl.removeEventListener('mouseup', this.onMouseUp);
+  },
+  isVelocityActive: function isVelocityActive() {
+    return this.data.enabled && !!this.direction;
+  },
+  getVelocityDelta: function getVelocityDelta() {
+    this.dVelocity.z = this.direction / 3;
+    return this.dVelocity.clone();
+  },
+  bindMethods: function bindMethods() {
+    this.onTouchStart = this.onTouchStart.bind(this);
+    this.onTouchMove = this.onTouchMove.bind(this);
+    this.onTouchEnd = this.onTouchEnd.bind(this);
+    this.onMouseDown = this.onMouseDown.bind(this);
+    this.onMouseMove = this.onMouseMove.bind(this);
+    this.onMouseUp = this.onMouseUp.bind(this);
+  },
+  onTouchStart: function onTouchStart(e) {
+    if (!e.touches || !e.touches.length) {
+      e.preventDefault();
+      return;
+    }
+    this.inProgress = true;
+    var targetMovement = e.touches[0];
+    this.prevPointerPosition = {
+      x: targetMovement.clientX,
+      y: targetMovement.clientY
+    };
+    e.preventDefault();
+  },
+  onTouchMove: function onTouchMove(e) {
+    if (!this.inProgress) {
+      e.preventDefault();
+      return;
+    }
+    if (!e.touches || !e.touches.length) {
+      e.preventDefault();
+      return;
+    }
+    var targetMovement = e.touches[0];
+    var dY = targetMovement.clientY - this.prevPointerPosition.y;
+    var dX = targetMovement.clientX - this.prevPointerPosition.x;
+    if (!this.isVerticalMovement(dX, dY)) {
+      e.preventDefault();
+      return;
+    }
+    if (dY > 0) {
+      this.direction = 1;
+    }
+    if (dY < 0) {
+      this.direction = -1;
+    }
+    this.prevPointerPosition.x = targetMovement.clientX;
+    this.prevPointerPosition.y = targetMovement.clientY;
+    e.preventDefault();
+  },
+  onTouchEnd: function onTouchEnd(e) {
+    this.prevPointerPosition = null;
+    this.inProgress = false;
+    this.direction = 0;
+    e.preventDefault();
+  },
+  onMouseDown: function onMouseDown(e) {
+    this.inProgress = true;
+    var targetMovement = e;
+    this.prevPointerPosition = {
+      x: targetMovement.clientX,
+      y: targetMovement.clientY
+    };
+    e.preventDefault();
+  },
+  onMouseMove: function onMouseMove(e) {
+    if (!this.inProgress) {
+      e.preventDefault();
+      return;
+    }
+    var targetMovement = e;
+    var dY = targetMovement.clientY - this.prevPointerPosition.y;
+    var dX = targetMovement.clientX - this.prevPointerPosition.x;
+    if (!this.isVerticalMovement(dX, dY)) {
+      e.preventDefault();
+      return;
+    }
+    if (dY > 0) {
+      this.direction = 1;
+    }
+    if (dY < 0) {
+      this.direction = -1;
+    }
+    this.prevPointerPosition.x = targetMovement.clientX;
+    this.prevPointerPosition.y = targetMovement.clientY;
+    e.preventDefault();
+  },
+  onMouseUp: function onMouseUp(e) {
+    this.prevPointerPosition = null;
+    this.inProgress = false;
+    this.direction = 0;
+    e.preventDefault();
+  },
+  isVerticalMovement: function isVerticalMovement(dX, dY) {
+    return Math.abs(dY) > Math.abs(dX) && Math.abs(dY) > 3;
+  }
+});
+
+},{}],17:[function(require,module,exports){
 'use strict';
 
 /**
@@ -9547,7 +9710,7 @@ module.exports = AFRAME.registerComponent('movement-controls', {
   }()
 });
 
-},{}],17:[function(require,module,exports){
+},{}],18:[function(require,module,exports){
 'use strict';
 
 /**
@@ -9630,7 +9793,7 @@ module.exports = AFRAME.registerComponent('touch-controls', {
   }
 });
 
-},{}],18:[function(require,module,exports){
+},{}],19:[function(require,module,exports){
 'use strict';
 
 /**
@@ -9829,7 +9992,7 @@ module.exports = AFRAME.registerComponent('trackpad-controls', {
 
 });
 
-},{}],19:[function(require,module,exports){
+},{}],20:[function(require,module,exports){
 'use strict';
 
 var LoopMode = {
@@ -9976,7 +10139,7 @@ function regExpEscape(s) {
   return s.replace(/[|\\{}()[\]^$+*?.]/g, '\\$&');
 }
 
-},{}],20:[function(require,module,exports){
+},{}],21:[function(require,module,exports){
 'use strict';
 
 THREE.ColladaLoader = require('../../lib/ColladaLoader');
@@ -10030,7 +10193,7 @@ module.exports.Component = AFRAME.registerComponent('collada-model-legacy', {
   }
 });
 
-},{"../../lib/ColladaLoader":3}],21:[function(require,module,exports){
+},{"../../lib/ColladaLoader":3}],22:[function(require,module,exports){
 'use strict';
 
 THREE.FBXLoader = require('../../lib/FBXLoader');
@@ -10071,7 +10234,7 @@ module.exports = AFRAME.registerComponent('fbx-model', {
   }
 });
 
-},{"../../lib/FBXLoader":4}],22:[function(require,module,exports){
+},{"../../lib/FBXLoader":4}],23:[function(require,module,exports){
 'use strict';
 
 var fetchScript = require('../../lib/fetch-script')();
@@ -10135,7 +10298,7 @@ module.exports = AFRAME.registerComponent('gltf-model-legacy', {
   }
 });
 
-},{"../../lib/fetch-script":8}],23:[function(require,module,exports){
+},{"../../lib/fetch-script":8}],24:[function(require,module,exports){
 'use strict';
 
 require('./animation-mixer');
@@ -10144,7 +10307,7 @@ require('./fbx-model');
 require('./gltf-model-legacy');
 require('./object-model');
 
-},{"./animation-mixer":19,"./collada-model-legacy":20,"./fbx-model":21,"./gltf-model-legacy":22,"./object-model":24}],24:[function(require,module,exports){
+},{"./animation-mixer":20,"./collada-model-legacy":21,"./fbx-model":22,"./gltf-model-legacy":23,"./object-model":25}],25:[function(require,module,exports){
 'use strict';
 
 /**
@@ -10204,7 +10367,7 @@ module.exports = AFRAME.registerComponent('object-model', {
   }
 });
 
-},{}],25:[function(require,module,exports){
+},{}],26:[function(require,module,exports){
 'use strict';
 
 module.exports = AFRAME.registerComponent('checkpoint', {
@@ -10246,7 +10409,7 @@ module.exports = AFRAME.registerComponent('checkpoint', {
   }
 });
 
-},{}],26:[function(require,module,exports){
+},{}],27:[function(require,module,exports){
 'use strict';
 
 /**
@@ -10383,7 +10546,7 @@ module.exports = AFRAME.registerComponent('cube-env-map', {
   }
 });
 
-},{}],27:[function(require,module,exports){
+},{}],28:[function(require,module,exports){
 'use strict';
 
 /* global CANNON */
@@ -10466,7 +10629,7 @@ module.exports = AFRAME.registerComponent('grab', {
   }
 });
 
-},{}],28:[function(require,module,exports){
+},{}],29:[function(require,module,exports){
 'use strict';
 
 require('./checkpoint');
@@ -10478,7 +10641,7 @@ require('./mesh-smooth');
 require('./normal-material');
 require('./sphere-collider');
 
-},{"./checkpoint":25,"./cube-env-map":26,"./grab":27,"./jump-ability":29,"./kinematic-body":30,"./mesh-smooth":31,"./normal-material":32,"./sphere-collider":33}],29:[function(require,module,exports){
+},{"./checkpoint":26,"./cube-env-map":27,"./grab":28,"./jump-ability":30,"./kinematic-body":31,"./mesh-smooth":32,"./normal-material":33,"./sphere-collider":34}],30:[function(require,module,exports){
 'use strict';
 
 var ACCEL_G = -9.8,
@@ -10546,7 +10709,7 @@ module.exports = AFRAME.registerComponent('jump-ability', {
   }
 });
 
-},{}],30:[function(require,module,exports){
+},{}],31:[function(require,module,exports){
 'use strict';
 
 /* global CANNON */
@@ -10754,7 +10917,7 @@ module.exports = AFRAME.registerComponent('kinematic-body', {
   }
 });
 
-},{}],31:[function(require,module,exports){
+},{}],32:[function(require,module,exports){
 'use strict';
 
 /**
@@ -10772,7 +10935,7 @@ module.exports = AFRAME.registerComponent('mesh-smooth', {
   }
 });
 
-},{}],32:[function(require,module,exports){
+},{}],33:[function(require,module,exports){
 'use strict';
 
 /**
@@ -10801,7 +10964,7 @@ module.exports = AFRAME.registerComponent('normal-material', {
   }
 });
 
-},{}],33:[function(require,module,exports){
+},{}],34:[function(require,module,exports){
 'use strict';
 
 /**
@@ -10967,14 +11130,14 @@ module.exports = AFRAME.registerComponent('sphere-collider', {
   }
 });
 
-},{}],34:[function(require,module,exports){
+},{}],35:[function(require,module,exports){
 'use strict';
 
 require('./nav-mesh');
 require('./nav-agent');
 require('./system');
 
-},{"./nav-agent":35,"./nav-mesh":36,"./system":37}],35:[function(require,module,exports){
+},{"./nav-agent":36,"./nav-mesh":37,"./system":38}],36:[function(require,module,exports){
 'use strict';
 
 module.exports = AFRAME.registerComponent('nav-agent', {
@@ -11080,7 +11243,7 @@ module.exports = AFRAME.registerComponent('nav-agent', {
   }()
 });
 
-},{}],36:[function(require,module,exports){
+},{}],37:[function(require,module,exports){
 'use strict';
 
 /**
@@ -11124,7 +11287,7 @@ module.exports = AFRAME.registerComponent('nav-mesh', {
   }
 });
 
-},{}],37:[function(require,module,exports){
+},{}],38:[function(require,module,exports){
 'use strict';
 
 var _require = require('three-pathfinding'),
@@ -11223,7 +11386,7 @@ module.exports = AFRAME.registerSystem('nav', {
   }
 });
 
-},{"three-pathfinding":11}],38:[function(require,module,exports){
+},{"three-pathfinding":11}],39:[function(require,module,exports){
 'use strict';
 
 /**
@@ -11252,7 +11415,7 @@ module.exports = AFRAME.registerPrimitive('a-grid', {
   }
 });
 
-},{}],39:[function(require,module,exports){
+},{}],40:[function(require,module,exports){
 'use strict';
 
 var vg = require('../../lib/hex-grid.min.js');
@@ -11312,7 +11475,7 @@ module.exports.Component = AFRAME.registerComponent('hexgrid', {
   }
 });
 
-},{"../../lib/default-hex-grid":7,"../../lib/hex-grid.min.js":9}],40:[function(require,module,exports){
+},{"../../lib/default-hex-grid":7,"../../lib/hex-grid.min.js":9}],41:[function(require,module,exports){
 'use strict';
 
 /**
@@ -11415,7 +11578,7 @@ module.exports.Component = AFRAME.registerComponent('ocean', {
   }
 });
 
-},{}],41:[function(require,module,exports){
+},{}],42:[function(require,module,exports){
 'use strict';
 
 /**
@@ -11487,7 +11650,7 @@ module.exports.Component = AFRAME.registerComponent('tube', {
   }
 });
 
-},{}],42:[function(require,module,exports){
+},{}],43:[function(require,module,exports){
 'use strict';
 
 require('./a-grid');
@@ -11495,4 +11658,4 @@ require('./a-hexgrid');
 require('./a-ocean');
 require('./a-tube');
 
-},{"./a-grid":38,"./a-hexgrid":39,"./a-ocean":40,"./a-tube":41}]},{},[1]);
+},{"./a-grid":39,"./a-hexgrid":40,"./a-ocean":41,"./a-tube":42}]},{},[1]);
