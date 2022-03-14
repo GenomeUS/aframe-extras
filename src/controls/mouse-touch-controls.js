@@ -67,7 +67,7 @@ module.exports = AFRAME.registerComponent('mouse-touch-controls', {
   },
 
   getVelocityDelta() {
-    this.dVelocity.z = this.direction / 3;
+    this.dVelocity.z = this.direction / 1.5;
     return this.dVelocity.clone();
   },
 
