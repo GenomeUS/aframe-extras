@@ -37,7 +37,6 @@ module.exports = AFRAME.registerComponent('joystick-controls', {
    * Called once when component is attached. Generally for initial setup.
    */
   init: function () {
-    console.log("HERE JOYSTICK CONTROLS");
     const sceneEl = this.el.sceneEl;
 
     this.prevTime = window.performance.now();
@@ -61,19 +60,18 @@ module.exports = AFRAME.registerComponent('joystick-controls', {
     sceneEl.addBehavior(this);
   },
 
-  // /**
-  //  * Called when component is attached and when component data changes.
-  //  * Generally modifies the entity based on the data.
-  //  */
-  // update: function () { this.tick(); },
-  //
-  // /**
-  //  * Called on each iteration of main render loop.
-  //  */
-  // tick: function (t, dt) {
-  //   // this.updateRotation(dt);
-  //   console.log({t, dt});
-  // },
+  /**
+   * Called when component is attached and when component data changes.
+   * Generally modifies the entity based on the data.
+   */
+  update: function () { this.tick(); },
+
+  /**
+   * Called on each iteration of main render loop.
+   */
+  tick: function (t, dt) {
+    this.updateRotation(dt);
+  },
 
   /**
    * Called when a component is removed (e.g., via removeAttribute).
@@ -86,7 +84,7 @@ module.exports = AFRAME.registerComponent('joystick-controls', {
    */
 
   getJoystickData: function () {
-    return window[this.data.joystick];
+    return window[this.data.joystick] || {x: 0, y: 0};
   },
 
   isVelocityActive: function () {
@@ -94,8 +92,6 @@ module.exports = AFRAME.registerComponent('joystick-controls', {
 
     const joystickData = this.getJoystickData();
     const inputY = joystickData.y;
-
-    // console.log({active:Math.abs(inputY) > JOYSTICK_EPS,  inputY, JOYSTICK_EPS});
 
     return Math.abs(inputY) > JOYSTICK_EPS;
   },
@@ -113,50 +109,53 @@ module.exports = AFRAME.registerComponent('joystick-controls', {
     return dVelocity;
   },
 
-  // /*******************************************************************
-  //  * Rotation
-  //  */
-  //
-  // isRotationActive: function () {
-  //   if (!this.data.enabled) return false;
-  //
-  //
-  //   const joystickData = this.getJoystickData();
-  //   const inputX = joystickData.x;
-  //
-  //   return Math.abs(inputX) > JOYSTICK_EPS;
-  // },
-  //
-  // updateRotation: function (dt) {
-  //   if (!this.isRotationActive()) return;
-  //
-  //   const data = this.data;
-  //   const pitch = this.pitch;
-  //   const lookControls = data.camera.components['look-controls'];
-  //   const hasLookControls = lookControls && lookControls.pitchObject && lookControls.yawObject;
-  //
-  //   // Sync with look-controls pitch/yaw if available.
-  //   if (hasLookControls) {
-  //     pitch.rotation.copy(lookControls.pitchObject.rotation);
-  //   }
-  //
-  //   const lookVector = this._lookVector;
-  //
-  //   // lookVector.y =
-  //
-  //   if (Math.abs(lookVector.y) <= JOYSTICK_EPS) lookVector.y = 0;
-  //
-  //   lookVector.multiplyScalar(data.rotationSensitivity * dt / 1000);
-  //   pitch.rotation.x -= lookVector.y;
-  //   pitch.rotation.x = Math.max(- Math.PI / 2, Math.min(Math.PI / 2, pitch.rotation.x));
-  //   data.camera.object3D.rotation.set(pitch.rotation.x, yaw.rotation.y, 0);
-  //
-  //   // Sync with look-controls pitch/yaw if available.
-  //   if (hasLookControls) {
-  //     lookControls.pitchObject.rotation.copy(pitch.rotation);
-  //   }
-  // },
-  //
+  /*******************************************************************
+   * Rotation
+   */
+
+  isRotationActive: function () {
+    if (!this.data.enabled) return false;
+
+
+    const joystickData = this.getJoystickData();
+    const inputX = joystickData.x;
+
+    return Math.abs(inputX) > JOYSTICK_EPS;
+  },
+
+  updateRotation: function (dt) {
+    if (!this.isRotationActive()) return;
+
+    const data = this.data;
+    const pitch = this.pitch;
+    const lookControls = data.camera.components['look-controls-horizontal'];
+    const hasLookControls = lookControls && lookControls.pitchObject && lookControls.yawObject;
+
+    // Sync with look-controls pitch/yaw if available.
+    if (hasLookControls) {
+      pitch.rotation.copy(lookControls.pitchObject.rotation);
+    }
+
+    const lookVector = this._lookVector;
+
+    const joystickData = this.getJoystickData();
+    const inputX = joystickData.x;
+
+    lookVector.set(inputX, 0);
+
+    if (Math.abs(lookVector.y) <= JOYSTICK_EPS) lookVector.y = 0;
+
+    lookVector.multiplyScalar(data.rotationSensitivity * dt / 1000);
+    pitch.rotation.x -= lookVector.y;
+    pitch.rotation.x = Math.max(- Math.PI / 2, Math.min(Math.PI / 2, pitch.rotation.x));
+    data.camera.object3D.rotation.set(pitch.rotation.x, 0, 0);
+
+    // Sync with look-controls pitch/yaw if available.
+    if (hasLookControls) {
+      lookControls.pitchObject.rotation.copy(pitch.rotation);
+    }
+  },
+
 
 
 });

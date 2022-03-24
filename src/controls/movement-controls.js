@@ -147,7 +147,6 @@ module.exports = AFRAME.registerComponent('movement-controls', {
         const control = this.el.components[data.controls[i] + COMPONENT_SUFFIX];
         if (control && control.isVelocityActive()) {
           this.velocityCtrl = control;
-          console.log('velocity crtl', this.velocityCtrl);
           return;
         }
       }
