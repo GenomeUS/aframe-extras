@@ -1236,8 +1236,185 @@ require('./touch-controls');
 require('./mouse-touch-controls');
 require('./movement-controls');
 require('./trackpad-controls');
+require('./joystick-controls');
 
-},{"./checkpoint-controls":5,"./gamepad-controls":6,"./keyboard-controls":8,"./mouse-touch-controls":9,"./movement-controls":10,"./touch-controls":11,"./trackpad-controls":12}],8:[function(require,module,exports){
+},{"./checkpoint-controls":5,"./gamepad-controls":6,"./joystick-controls":8,"./keyboard-controls":9,"./mouse-touch-controls":10,"./movement-controls":11,"./touch-controls":12,"./trackpad-controls":13}],8:[function(require,module,exports){
+'use strict';
+
+/**
+ * Gamepad controls for A-Frame.
+ *
+ * Stripped-down version of: https://github.com/donmccurdy/aframe-gamepad-controls
+ *
+ * For more information about the Gamepad API, see:
+ * https://developer.mozilla.org/en-US/docs/Web/API/Gamepad_API/Using_the_Gamepad_API
+ */
+
+var JOYSTICK_EPS = 10;
+
+var Hand = {
+  LEFT: 'left',
+  RIGHT: 'right'
+};
+
+var Joystick = {
+  MOVEMENT: 1,
+  ROTATION: 2
+};
+
+module.exports = AFRAME.registerComponent('joystick-controls', {
+
+  /*******************************************************************
+   * Schema
+   */
+
+  schema: {
+    // Enable/disable gamepad-controls
+    enabled: { default: true },
+
+    // Heading element for rotation
+    camera: { default: '[camera]', type: 'selector' },
+
+    // Rotation sensitivity
+    rotationSensitivity: { default: 2.0 },
+
+    // Joystick variable
+    joystick: { default: 'joystick' }
+  },
+
+  /*******************************************************************
+   * Core
+   */
+
+  /**
+   * Called once when component is attached. Generally for initial setup.
+   */
+  init: function init() {
+    console.log("HERE JOYSTICK CONTROLS");
+    var sceneEl = this.el.sceneEl;
+
+    this.prevTime = window.performance.now();
+
+    // Button state
+    this.buttons = {};
+
+    // Rotation
+    var rotation = this.el.object3D.rotation;
+    this.pitch = new THREE.Object3D();
+    this.pitch.rotation.x = THREE.Math.degToRad(rotation.x);
+    this.yaw = new THREE.Object3D();
+    this.yaw.position.y = 10;
+    this.yaw.rotation.y = THREE.Math.degToRad(rotation.y);
+    this.yaw.add(this.pitch);
+
+    this._lookVector = new THREE.Vector2();
+    this._moveVector = new THREE.Vector2();
+    this._dpadVector = new THREE.Vector2();
+
+    sceneEl.addBehavior(this);
+  },
+
+  // /**
+  //  * Called when component is attached and when component data changes.
+  //  * Generally modifies the entity based on the data.
+  //  */
+  // update: function () { this.tick(); },
+  //
+  // /**
+  //  * Called on each iteration of main render loop.
+  //  */
+  // tick: function (t, dt) {
+  //   // this.updateRotation(dt);
+  //   console.log({t, dt});
+  // },
+
+  /**
+   * Called when a component is removed (e.g., via removeAttribute).
+   * Generally undoes all modifications to the entity.
+   */
+  remove: function remove() {},
+
+  /*******************************************************************
+   * Movement
+   */
+
+  getJoystickData: function getJoystickData() {
+    return window[this.data.joystick];
+  },
+
+  isVelocityActive: function isVelocityActive() {
+    if (!this.data.enabled) return false;
+
+    var joystickData = this.getJoystickData();
+    var inputY = joystickData.y;
+
+    // console.log({active:Math.abs(inputY) > JOYSTICK_EPS,  inputY, JOYSTICK_EPS});
+
+    return Math.abs(inputY) > JOYSTICK_EPS;
+  },
+
+  getVelocityDelta: function getVelocityDelta() {
+    var joystickData = this.getJoystickData();
+    var inputY = joystickData.y;
+
+    var dVelocity = new THREE.Vector3();
+
+    if (Math.abs(inputY) > JOYSTICK_EPS) {
+      dVelocity.z += inputY / 66;
+    }
+
+    return dVelocity;
+  }
+
+  // /*******************************************************************
+  //  * Rotation
+  //  */
+  //
+  // isRotationActive: function () {
+  //   if (!this.data.enabled) return false;
+  //
+  //
+  //   const joystickData = this.getJoystickData();
+  //   const inputX = joystickData.x;
+  //
+  //   return Math.abs(inputX) > JOYSTICK_EPS;
+  // },
+  //
+  // updateRotation: function (dt) {
+  //   if (!this.isRotationActive()) return;
+  //
+  //   const data = this.data;
+  //   const pitch = this.pitch;
+  //   const lookControls = data.camera.components['look-controls'];
+  //   const hasLookControls = lookControls && lookControls.pitchObject && lookControls.yawObject;
+  //
+  //   // Sync with look-controls pitch/yaw if available.
+  //   if (hasLookControls) {
+  //     pitch.rotation.copy(lookControls.pitchObject.rotation);
+  //   }
+  //
+  //   const lookVector = this._lookVector;
+  //
+  //   // lookVector.y =
+  //
+  //   if (Math.abs(lookVector.y) <= JOYSTICK_EPS) lookVector.y = 0;
+  //
+  //   lookVector.multiplyScalar(data.rotationSensitivity * dt / 1000);
+  //   pitch.rotation.x -= lookVector.y;
+  //   pitch.rotation.x = Math.max(- Math.PI / 2, Math.min(Math.PI / 2, pitch.rotation.x));
+  //   data.camera.object3D.rotation.set(pitch.rotation.x, yaw.rotation.y, 0);
+  //
+  //   // Sync with look-controls pitch/yaw if available.
+  //   if (hasLookControls) {
+  //     lookControls.pitchObject.rotation.copy(pitch.rotation);
+  //   }
+  // },
+  //
+
+
+});
+
+},{}],9:[function(require,module,exports){
 'use strict';
 
 require('../../lib/keyboard.polyfill');
@@ -1402,7 +1579,7 @@ module.exports = AFRAME.registerComponent('keyboard-controls', {
 
 });
 
-},{"../../lib/keyboard.polyfill":4}],9:[function(require,module,exports){
+},{"../../lib/keyboard.polyfill":4}],10:[function(require,module,exports){
 'use strict';
 
 /**
@@ -1564,7 +1741,7 @@ module.exports = AFRAME.registerComponent('mouse-touch-controls', {
   }
 });
 
-},{}],10:[function(require,module,exports){
+},{}],11:[function(require,module,exports){
 'use strict';
 
 /**
@@ -1589,7 +1766,7 @@ module.exports = AFRAME.registerComponent('movement-controls', {
 
   schema: {
     enabled: { default: true },
-    controls: { default: ['gamepad', 'trackpad', 'keyboard', 'touch'] },
+    controls: { default: ['gamepad', 'trackpad', 'keyboard', 'touch', 'joystick'] },
     speed: { default: 0.3, min: 0 },
     fly: { default: false },
     constrainToNavMesh: { default: false },
@@ -1711,6 +1888,7 @@ module.exports = AFRAME.registerComponent('movement-controls', {
         var control = this.el.components[data.controls[i] + COMPONENT_SUFFIX];
         if (control && control.isVelocityActive()) {
           this.velocityCtrl = control;
+          console.log('velocity crtl', this.velocityCtrl);
           return;
         }
       }
@@ -1770,7 +1948,7 @@ module.exports = AFRAME.registerComponent('movement-controls', {
   }()
 });
 
-},{}],11:[function(require,module,exports){
+},{}],12:[function(require,module,exports){
 'use strict';
 
 /**
@@ -1853,7 +2031,7 @@ module.exports = AFRAME.registerComponent('touch-controls', {
   }
 });
 
-},{}],12:[function(require,module,exports){
+},{}],13:[function(require,module,exports){
 'use strict';
 
 /**

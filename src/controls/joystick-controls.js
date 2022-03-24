@@ -1,0 +1,162 @@
+/**
+ * Gamepad controls for A-Frame.
+ *
+ * Stripped-down version of: https://github.com/donmccurdy/aframe-gamepad-controls
+ *
+ * For more information about the Gamepad API, see:
+ * https://developer.mozilla.org/en-US/docs/Web/API/Gamepad_API/Using_the_Gamepad_API
+ */
+
+const JOYSTICK_EPS = 10;
+
+module.exports = AFRAME.registerComponent('joystick-controls', {
+
+  /*******************************************************************
+   * Schema
+   */
+
+  schema: {
+    // Enable/disable gamepad-controls
+    enabled: { default: true },
+
+    // Heading element for rotation
+    camera: { default: '[camera]', type: 'selector' },
+
+    // Rotation sensitivity
+    rotationSensitivity: { default: 2.0 },
+
+    // Joystick variable
+    joystick: { default: 'joystick' },
+  },
+
+  /*******************************************************************
+   * Core
+   */
+
+  /**
+   * Called once when component is attached. Generally for initial setup.
+   */
+  init: function () {
+    console.log("HERE JOYSTICK CONTROLS");
+    const sceneEl = this.el.sceneEl;
+
+    this.prevTime = window.performance.now();
+
+    // Button state
+    this.buttons = {};
+
+    // Rotation
+    const rotation = this.el.object3D.rotation;
+    this.pitch = new THREE.Object3D();
+    this.pitch.rotation.x = THREE.Math.degToRad(rotation.x);
+    this.yaw = new THREE.Object3D();
+    this.yaw.position.y = 10;
+    this.yaw.rotation.y = THREE.Math.degToRad(rotation.y);
+    this.yaw.add(this.pitch);
+
+    this._lookVector = new THREE.Vector2();
+    this._moveVector = new THREE.Vector2();
+    this._dpadVector = new THREE.Vector2();
+
+    sceneEl.addBehavior(this);
+  },
+
+  // /**
+  //  * Called when component is attached and when component data changes.
+  //  * Generally modifies the entity based on the data.
+  //  */
+  // update: function () { this.tick(); },
+  //
+  // /**
+  //  * Called on each iteration of main render loop.
+  //  */
+  // tick: function (t, dt) {
+  //   // this.updateRotation(dt);
+  //   console.log({t, dt});
+  // },
+
+  /**
+   * Called when a component is removed (e.g., via removeAttribute).
+   * Generally undoes all modifications to the entity.
+   */
+  remove: function () { },
+
+  /*******************************************************************
+   * Movement
+   */
+
+  getJoystickData: function () {
+    return window[this.data.joystick];
+  },
+
+  isVelocityActive: function () {
+    if (!this.data.enabled) return false;
+
+    const joystickData = this.getJoystickData();
+    const inputY = joystickData.y;
+
+    // console.log({active:Math.abs(inputY) > JOYSTICK_EPS,  inputY, JOYSTICK_EPS});
+
+    return Math.abs(inputY) > JOYSTICK_EPS;
+  },
+
+  getVelocityDelta: function () {
+    const joystickData = this.getJoystickData();
+    const inputY = joystickData.y;
+
+    const dVelocity = new THREE.Vector3();
+
+    if (Math.abs(inputY) > JOYSTICK_EPS) {
+      dVelocity.z += inputY / 66;
+    }
+
+    return dVelocity;
+  },
+
+  // /*******************************************************************
+  //  * Rotation
+  //  */
+  //
+  // isRotationActive: function () {
+  //   if (!this.data.enabled) return false;
+  //
+  //
+  //   const joystickData = this.getJoystickData();
+  //   const inputX = joystickData.x;
+  //
+  //   return Math.abs(inputX) > JOYSTICK_EPS;
+  // },
+  //
+  // updateRotation: function (dt) {
+  //   if (!this.isRotationActive()) return;
+  //
+  //   const data = this.data;
+  //   const pitch = this.pitch;
+  //   const lookControls = data.camera.components['look-controls'];
+  //   const hasLookControls = lookControls && lookControls.pitchObject && lookControls.yawObject;
+  //
+  //   // Sync with look-controls pitch/yaw if available.
+  //   if (hasLookControls) {
+  //     pitch.rotation.copy(lookControls.pitchObject.rotation);
+  //   }
+  //
+  //   const lookVector = this._lookVector;
+  //
+  //   // lookVector.y =
+  //
+  //   if (Math.abs(lookVector.y) <= JOYSTICK_EPS) lookVector.y = 0;
+  //
+  //   lookVector.multiplyScalar(data.rotationSensitivity * dt / 1000);
+  //   pitch.rotation.x -= lookVector.y;
+  //   pitch.rotation.x = Math.max(- Math.PI / 2, Math.min(Math.PI / 2, pitch.rotation.x));
+  //   data.camera.object3D.rotation.set(pitch.rotation.x, yaw.rotation.y, 0);
+  //
+  //   // Sync with look-controls pitch/yaw if available.
+  //   if (hasLookControls) {
+  //     lookControls.pitchObject.rotation.copy(pitch.rotation);
+  //   }
+  // },
+  //
+
+
+});

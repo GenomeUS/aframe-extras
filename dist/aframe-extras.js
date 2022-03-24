@@ -12,7 +12,7 @@ require('./src/misc');
 require('./src/pathfinding');
 require('./src/primitives');
 
-},{"./src/controls":14,"./src/loaders":24,"./src/misc":29,"./src/pathfinding":35,"./src/primitives":43}],3:[function(require,module,exports){
+},{"./src/controls":14,"./src/loaders":25,"./src/misc":30,"./src/pathfinding":36,"./src/primitives":44}],3:[function(require,module,exports){
 'use strict';
 
 /**
@@ -9176,8 +9176,185 @@ require('./touch-controls');
 require('./mouse-touch-controls');
 require('./movement-controls');
 require('./trackpad-controls');
+require('./joystick-controls');
 
-},{"./checkpoint-controls":12,"./gamepad-controls":13,"./keyboard-controls":15,"./mouse-touch-controls":16,"./movement-controls":17,"./touch-controls":18,"./trackpad-controls":19}],15:[function(require,module,exports){
+},{"./checkpoint-controls":12,"./gamepad-controls":13,"./joystick-controls":15,"./keyboard-controls":16,"./mouse-touch-controls":17,"./movement-controls":18,"./touch-controls":19,"./trackpad-controls":20}],15:[function(require,module,exports){
+'use strict';
+
+/**
+ * Gamepad controls for A-Frame.
+ *
+ * Stripped-down version of: https://github.com/donmccurdy/aframe-gamepad-controls
+ *
+ * For more information about the Gamepad API, see:
+ * https://developer.mozilla.org/en-US/docs/Web/API/Gamepad_API/Using_the_Gamepad_API
+ */
+
+var JOYSTICK_EPS = 10;
+
+var Hand = {
+  LEFT: 'left',
+  RIGHT: 'right'
+};
+
+var Joystick = {
+  MOVEMENT: 1,
+  ROTATION: 2
+};
+
+module.exports = AFRAME.registerComponent('joystick-controls', {
+
+  /*******************************************************************
+   * Schema
+   */
+
+  schema: {
+    // Enable/disable gamepad-controls
+    enabled: { default: true },
+
+    // Heading element for rotation
+    camera: { default: '[camera]', type: 'selector' },
+
+    // Rotation sensitivity
+    rotationSensitivity: { default: 2.0 },
+
+    // Joystick variable
+    joystick: { default: 'joystick' }
+  },
+
+  /*******************************************************************
+   * Core
+   */
+
+  /**
+   * Called once when component is attached. Generally for initial setup.
+   */
+  init: function init() {
+    console.log("HERE JOYSTICK CONTROLS");
+    var sceneEl = this.el.sceneEl;
+
+    this.prevTime = window.performance.now();
+
+    // Button state
+    this.buttons = {};
+
+    // Rotation
+    var rotation = this.el.object3D.rotation;
+    this.pitch = new THREE.Object3D();
+    this.pitch.rotation.x = THREE.Math.degToRad(rotation.x);
+    this.yaw = new THREE.Object3D();
+    this.yaw.position.y = 10;
+    this.yaw.rotation.y = THREE.Math.degToRad(rotation.y);
+    this.yaw.add(this.pitch);
+
+    this._lookVector = new THREE.Vector2();
+    this._moveVector = new THREE.Vector2();
+    this._dpadVector = new THREE.Vector2();
+
+    sceneEl.addBehavior(this);
+  },
+
+  // /**
+  //  * Called when component is attached and when component data changes.
+  //  * Generally modifies the entity based on the data.
+  //  */
+  // update: function () { this.tick(); },
+  //
+  // /**
+  //  * Called on each iteration of main render loop.
+  //  */
+  // tick: function (t, dt) {
+  //   // this.updateRotation(dt);
+  //   console.log({t, dt});
+  // },
+
+  /**
+   * Called when a component is removed (e.g., via removeAttribute).
+   * Generally undoes all modifications to the entity.
+   */
+  remove: function remove() {},
+
+  /*******************************************************************
+   * Movement
+   */
+
+  getJoystickData: function getJoystickData() {
+    return window[this.data.joystick];
+  },
+
+  isVelocityActive: function isVelocityActive() {
+    if (!this.data.enabled) return false;
+
+    var joystickData = this.getJoystickData();
+    var inputY = joystickData.y;
+
+    // console.log({active:Math.abs(inputY) > JOYSTICK_EPS,  inputY, JOYSTICK_EPS});
+
+    return Math.abs(inputY) > JOYSTICK_EPS;
+  },
+
+  getVelocityDelta: function getVelocityDelta() {
+    var joystickData = this.getJoystickData();
+    var inputY = joystickData.y;
+
+    var dVelocity = new THREE.Vector3();
+
+    if (Math.abs(inputY) > JOYSTICK_EPS) {
+      dVelocity.z += inputY / 66;
+    }
+
+    return dVelocity;
+  }
+
+  // /*******************************************************************
+  //  * Rotation
+  //  */
+  //
+  // isRotationActive: function () {
+  //   if (!this.data.enabled) return false;
+  //
+  //
+  //   const joystickData = this.getJoystickData();
+  //   const inputX = joystickData.x;
+  //
+  //   return Math.abs(inputX) > JOYSTICK_EPS;
+  // },
+  //
+  // updateRotation: function (dt) {
+  //   if (!this.isRotationActive()) return;
+  //
+  //   const data = this.data;
+  //   const pitch = this.pitch;
+  //   const lookControls = data.camera.components['look-controls'];
+  //   const hasLookControls = lookControls && lookControls.pitchObject && lookControls.yawObject;
+  //
+  //   // Sync with look-controls pitch/yaw if available.
+  //   if (hasLookControls) {
+  //     pitch.rotation.copy(lookControls.pitchObject.rotation);
+  //   }
+  //
+  //   const lookVector = this._lookVector;
+  //
+  //   // lookVector.y =
+  //
+  //   if (Math.abs(lookVector.y) <= JOYSTICK_EPS) lookVector.y = 0;
+  //
+  //   lookVector.multiplyScalar(data.rotationSensitivity * dt / 1000);
+  //   pitch.rotation.x -= lookVector.y;
+  //   pitch.rotation.x = Math.max(- Math.PI / 2, Math.min(Math.PI / 2, pitch.rotation.x));
+  //   data.camera.object3D.rotation.set(pitch.rotation.x, yaw.rotation.y, 0);
+  //
+  //   // Sync with look-controls pitch/yaw if available.
+  //   if (hasLookControls) {
+  //     lookControls.pitchObject.rotation.copy(pitch.rotation);
+  //   }
+  // },
+  //
+
+
+});
+
+},{}],16:[function(require,module,exports){
 'use strict';
 
 require('../../lib/keyboard.polyfill');
@@ -9342,7 +9519,7 @@ module.exports = AFRAME.registerComponent('keyboard-controls', {
 
 });
 
-},{"../../lib/keyboard.polyfill":10}],16:[function(require,module,exports){
+},{"../../lib/keyboard.polyfill":10}],17:[function(require,module,exports){
 'use strict';
 
 /**
@@ -9504,7 +9681,7 @@ module.exports = AFRAME.registerComponent('mouse-touch-controls', {
   }
 });
 
-},{}],17:[function(require,module,exports){
+},{}],18:[function(require,module,exports){
 'use strict';
 
 /**
@@ -9529,7 +9706,7 @@ module.exports = AFRAME.registerComponent('movement-controls', {
 
   schema: {
     enabled: { default: true },
-    controls: { default: ['gamepad', 'trackpad', 'keyboard', 'touch'] },
+    controls: { default: ['gamepad', 'trackpad', 'keyboard', 'touch', 'joystick'] },
     speed: { default: 0.3, min: 0 },
     fly: { default: false },
     constrainToNavMesh: { default: false },
@@ -9651,6 +9828,7 @@ module.exports = AFRAME.registerComponent('movement-controls', {
         var control = this.el.components[data.controls[i] + COMPONENT_SUFFIX];
         if (control && control.isVelocityActive()) {
           this.velocityCtrl = control;
+          console.log('velocity crtl', this.velocityCtrl);
           return;
         }
       }
@@ -9710,7 +9888,7 @@ module.exports = AFRAME.registerComponent('movement-controls', {
   }()
 });
 
-},{}],18:[function(require,module,exports){
+},{}],19:[function(require,module,exports){
 'use strict';
 
 /**
@@ -9793,7 +9971,7 @@ module.exports = AFRAME.registerComponent('touch-controls', {
   }
 });
 
-},{}],19:[function(require,module,exports){
+},{}],20:[function(require,module,exports){
 'use strict';
 
 /**
@@ -9992,7 +10170,7 @@ module.exports = AFRAME.registerComponent('trackpad-controls', {
 
 });
 
-},{}],20:[function(require,module,exports){
+},{}],21:[function(require,module,exports){
 'use strict';
 
 var LoopMode = {
@@ -10139,7 +10317,7 @@ function regExpEscape(s) {
   return s.replace(/[|\\{}()[\]^$+*?.]/g, '\\$&');
 }
 
-},{}],21:[function(require,module,exports){
+},{}],22:[function(require,module,exports){
 'use strict';
 
 THREE.ColladaLoader = require('../../lib/ColladaLoader');
@@ -10193,7 +10371,7 @@ module.exports.Component = AFRAME.registerComponent('collada-model-legacy', {
   }
 });
 
-},{"../../lib/ColladaLoader":3}],22:[function(require,module,exports){
+},{"../../lib/ColladaLoader":3}],23:[function(require,module,exports){
 'use strict';
 
 THREE.FBXLoader = require('../../lib/FBXLoader');
@@ -10234,7 +10412,7 @@ module.exports = AFRAME.registerComponent('fbx-model', {
   }
 });
 
-},{"../../lib/FBXLoader":4}],23:[function(require,module,exports){
+},{"../../lib/FBXLoader":4}],24:[function(require,module,exports){
 'use strict';
 
 var fetchScript = require('../../lib/fetch-script')();
@@ -10298,7 +10476,7 @@ module.exports = AFRAME.registerComponent('gltf-model-legacy', {
   }
 });
 
-},{"../../lib/fetch-script":8}],24:[function(require,module,exports){
+},{"../../lib/fetch-script":8}],25:[function(require,module,exports){
 'use strict';
 
 require('./animation-mixer');
@@ -10307,7 +10485,7 @@ require('./fbx-model');
 require('./gltf-model-legacy');
 require('./object-model');
 
-},{"./animation-mixer":20,"./collada-model-legacy":21,"./fbx-model":22,"./gltf-model-legacy":23,"./object-model":25}],25:[function(require,module,exports){
+},{"./animation-mixer":21,"./collada-model-legacy":22,"./fbx-model":23,"./gltf-model-legacy":24,"./object-model":26}],26:[function(require,module,exports){
 'use strict';
 
 /**
@@ -10367,7 +10545,7 @@ module.exports = AFRAME.registerComponent('object-model', {
   }
 });
 
-},{}],26:[function(require,module,exports){
+},{}],27:[function(require,module,exports){
 'use strict';
 
 module.exports = AFRAME.registerComponent('checkpoint', {
@@ -10409,7 +10587,7 @@ module.exports = AFRAME.registerComponent('checkpoint', {
   }
 });
 
-},{}],27:[function(require,module,exports){
+},{}],28:[function(require,module,exports){
 'use strict';
 
 /**
@@ -10546,7 +10724,7 @@ module.exports = AFRAME.registerComponent('cube-env-map', {
   }
 });
 
-},{}],28:[function(require,module,exports){
+},{}],29:[function(require,module,exports){
 'use strict';
 
 /* global CANNON */
@@ -10629,7 +10807,7 @@ module.exports = AFRAME.registerComponent('grab', {
   }
 });
 
-},{}],29:[function(require,module,exports){
+},{}],30:[function(require,module,exports){
 'use strict';
 
 require('./checkpoint');
@@ -10641,7 +10819,7 @@ require('./mesh-smooth');
 require('./normal-material');
 require('./sphere-collider');
 
-},{"./checkpoint":26,"./cube-env-map":27,"./grab":28,"./jump-ability":30,"./kinematic-body":31,"./mesh-smooth":32,"./normal-material":33,"./sphere-collider":34}],30:[function(require,module,exports){
+},{"./checkpoint":27,"./cube-env-map":28,"./grab":29,"./jump-ability":31,"./kinematic-body":32,"./mesh-smooth":33,"./normal-material":34,"./sphere-collider":35}],31:[function(require,module,exports){
 'use strict';
 
 var ACCEL_G = -9.8,
@@ -10709,7 +10887,7 @@ module.exports = AFRAME.registerComponent('jump-ability', {
   }
 });
 
-},{}],31:[function(require,module,exports){
+},{}],32:[function(require,module,exports){
 'use strict';
 
 /* global CANNON */
@@ -10917,7 +11095,7 @@ module.exports = AFRAME.registerComponent('kinematic-body', {
   }
 });
 
-},{}],32:[function(require,module,exports){
+},{}],33:[function(require,module,exports){
 'use strict';
 
 /**
@@ -10935,7 +11113,7 @@ module.exports = AFRAME.registerComponent('mesh-smooth', {
   }
 });
 
-},{}],33:[function(require,module,exports){
+},{}],34:[function(require,module,exports){
 'use strict';
 
 /**
@@ -10964,7 +11142,7 @@ module.exports = AFRAME.registerComponent('normal-material', {
   }
 });
 
-},{}],34:[function(require,module,exports){
+},{}],35:[function(require,module,exports){
 'use strict';
 
 /**
@@ -11130,14 +11308,14 @@ module.exports = AFRAME.registerComponent('sphere-collider', {
   }
 });
 
-},{}],35:[function(require,module,exports){
+},{}],36:[function(require,module,exports){
 'use strict';
 
 require('./nav-mesh');
 require('./nav-agent');
 require('./system');
 
-},{"./nav-agent":36,"./nav-mesh":37,"./system":38}],36:[function(require,module,exports){
+},{"./nav-agent":37,"./nav-mesh":38,"./system":39}],37:[function(require,module,exports){
 'use strict';
 
 module.exports = AFRAME.registerComponent('nav-agent', {
@@ -11243,7 +11421,7 @@ module.exports = AFRAME.registerComponent('nav-agent', {
   }()
 });
 
-},{}],37:[function(require,module,exports){
+},{}],38:[function(require,module,exports){
 'use strict';
 
 /**
@@ -11287,7 +11465,7 @@ module.exports = AFRAME.registerComponent('nav-mesh', {
   }
 });
 
-},{}],38:[function(require,module,exports){
+},{}],39:[function(require,module,exports){
 'use strict';
 
 var _require = require('three-pathfinding'),
@@ -11386,7 +11564,7 @@ module.exports = AFRAME.registerSystem('nav', {
   }
 });
 
-},{"three-pathfinding":11}],39:[function(require,module,exports){
+},{"three-pathfinding":11}],40:[function(require,module,exports){
 'use strict';
 
 /**
@@ -11415,7 +11593,7 @@ module.exports = AFRAME.registerPrimitive('a-grid', {
   }
 });
 
-},{}],40:[function(require,module,exports){
+},{}],41:[function(require,module,exports){
 'use strict';
 
 var vg = require('../../lib/hex-grid.min.js');
@@ -11475,7 +11653,7 @@ module.exports.Component = AFRAME.registerComponent('hexgrid', {
   }
 });
 
-},{"../../lib/default-hex-grid":7,"../../lib/hex-grid.min.js":9}],41:[function(require,module,exports){
+},{"../../lib/default-hex-grid":7,"../../lib/hex-grid.min.js":9}],42:[function(require,module,exports){
 'use strict';
 
 /**
@@ -11578,7 +11756,7 @@ module.exports.Component = AFRAME.registerComponent('ocean', {
   }
 });
 
-},{}],42:[function(require,module,exports){
+},{}],43:[function(require,module,exports){
 'use strict';
 
 /**
@@ -11650,7 +11828,7 @@ module.exports.Component = AFRAME.registerComponent('tube', {
   }
 });
 
-},{}],43:[function(require,module,exports){
+},{}],44:[function(require,module,exports){
 'use strict';
 
 require('./a-grid');
@@ -11658,4 +11836,4 @@ require('./a-hexgrid');
 require('./a-ocean');
 require('./a-tube');
 
-},{"./a-grid":39,"./a-hexgrid":40,"./a-ocean":41,"./a-tube":42}]},{},[1]);
+},{"./a-grid":40,"./a-hexgrid":41,"./a-ocean":42,"./a-tube":43}]},{},[1]);

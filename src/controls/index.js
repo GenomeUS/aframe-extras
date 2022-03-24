@@ -5,3 +5,4 @@ require('./touch-controls');
 require('./mouse-touch-controls');
 require('./movement-controls');
 require('./trackpad-controls');
+require('./joystick-controls');

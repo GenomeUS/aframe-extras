@@ -18,7 +18,7 @@ module.exports = AFRAME.registerComponent('movement-controls', {
 
   schema: {
     enabled:            { default: true },
-    controls:           { default: ['gamepad', 'trackpad', 'keyboard', 'touch'] },
+    controls:           { default: ['gamepad', 'trackpad', 'keyboard', 'touch', 'joystick'] },
     speed:              { default: 0.3, min: 0 },
     fly:                { default: false },
     constrainToNavMesh: { default: false },
@@ -147,6 +147,7 @@ module.exports = AFRAME.registerComponent('movement-controls', {
         const control = this.el.components[data.controls[i] + COMPONENT_SUFFIX];
         if (control && control.isVelocityActive()) {
           this.velocityCtrl = control;
+          console.log('velocity crtl', this.velocityCtrl);
           return;
         }
       }
