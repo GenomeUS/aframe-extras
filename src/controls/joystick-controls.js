@@ -23,7 +23,7 @@ module.exports = AFRAME.registerComponent('joystick-controls', {
     camera: { default: '[camera]', type: 'selector' },
 
     // Rotation sensitivity
-    rotationSensitivity: { default: 2.0 },
+    rotationSensitivity: { default: 0.01 },
 
     // Joystick variable
     joystick: { default: 'joystick' },
@@ -120,20 +120,21 @@ module.exports = AFRAME.registerComponent('joystick-controls', {
     const joystickData = this.getJoystickData();
     const inputX = joystickData.x;
 
-    return Math.abs(inputX) > JOYSTICK_EPS;
+    return Math.abs(inputX) > JOYSTICK_EPS * 2;
   },
 
   updateRotation: function (dt) {
     if (!this.isRotationActive()) return;
 
     const data = this.data;
-    const pitch = this.pitch;
-    const lookControls = data.camera.components['look-controls-horizontal'];
+    const yaw = this.yaw;
+    const camera = document.querySelector("#camera");
+    const lookControls = camera.components['look-controls-horizontal'];
     const hasLookControls = lookControls && lookControls.pitchObject && lookControls.yawObject;
 
     // Sync with look-controls pitch/yaw if available.
     if (hasLookControls) {
-      pitch.rotation.copy(lookControls.pitchObject.rotation);
+      yaw.rotation.copy(lookControls.yawObject.rotation);
     }
 
     const lookVector = this._lookVector;
@@ -146,13 +147,12 @@ module.exports = AFRAME.registerComponent('joystick-controls', {
     if (Math.abs(lookVector.y) <= JOYSTICK_EPS) lookVector.y = 0;
 
     lookVector.multiplyScalar(data.rotationSensitivity * dt / 1000);
-    pitch.rotation.x -= lookVector.y;
-    pitch.rotation.x = Math.max(- Math.PI / 2, Math.min(Math.PI / 2, pitch.rotation.x));
-    data.camera.object3D.rotation.set(pitch.rotation.x, 0, 0);
+    yaw.rotation.y -= lookVector.x;
+    camera.object3D.rotation.set(0, yaw.rotation.y, 0);
 
     // Sync with look-controls pitch/yaw if available.
     if (hasLookControls) {
-      lookControls.pitchObject.rotation.copy(pitch.rotation);
+      lookControls.yawObject.rotation.copy(yaw.rotation);
     }
   },
 
