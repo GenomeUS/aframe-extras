@@ -1372,7 +1372,7 @@ module.exports = AFRAME.registerComponent('joystick-controls', {
 
     var data = this.data;
     var yaw = this.yaw;
-    var camera = document.querySelector("#camera");
+    var camera = document.querySelector('#camera');
     var lookControls = camera.components['look-controls-horizontal'];
     var hasLookControls = lookControls && lookControls.pitchObject && lookControls.yawObject;
 
